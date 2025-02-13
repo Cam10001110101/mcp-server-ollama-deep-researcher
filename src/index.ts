@@ -3,15 +3,10 @@ import { Server } from "@modelcontextprotocol/sdk/server/index.js";
 import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
 import { ListToolsRequestSchema, CallToolRequestSchema } from "@modelcontextprotocol/sdk/types.js";
 import { spawn, ChildProcess } from "child_process";
-import { dirname } from "path";
+import { dirname, join } from "path";
 import { fileURLToPath } from "url";
-import * as dotenv from "dotenv";
-
-// Load environment variables from .env file
-dotenv.config();
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
-const projectRoot = dirname(dirname(__dirname));
 
 // Define response type
 interface PythonResponse {
@@ -42,6 +37,16 @@ let config: ResearchConfig = {
   llmModel: "deepseek-r1:1.5b",
   searchApi: "tavily"
 };
+
+// Validate required API keys based on search API
+function validateApiKeys(searchApi: string): void {
+  if (searchApi === "tavily" && !process.env.TAVILY_API_KEY) {
+    throw new Error("TAVILY_API_KEY is required when using Tavily search API");
+  }
+  if (searchApi === "perplexity" && !process.env.PERPLEXITY_API_KEY) {
+    throw new Error("PERPLEXITY_API_KEY is required when using Perplexity search API");
+  }
+}
 
 // Initialize server
 const server = new Server(
@@ -137,24 +142,34 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
       }
 
       try {
-        // Use Python from virtual environment directly
-        const pythonPath: string = process.platform === "win32" 
-          ? `${projectRoot}\\venv\\Scripts\\python.exe`
-          : `${projectRoot}/.venv/bin/python`;
+        // Validate API keys before starting research
+        validateApiKeys(config.searchApi);
+
+        // Validate max loops
+        if (config.maxLoops < 1 || config.maxLoops > 5) {
+          throw new Error("maxLoops must be between 1 and 5");
+        }
+
+        // Use Python from system path
+        const pythonPath = process.platform === "win32" ? "python" : "python3";
+
+        // Get absolute path to Python script from src directory
+const scriptPath = join(__dirname, "..", "src", "assistant", "run_research.py").replace(/\\/g, "/");
 
         // Run the research script with arguments
         const pythonProcess: ChildProcess = spawn(pythonPath, [
-          `${projectRoot}/src/assistant/run_research.py`,
+          scriptPath,
           topic,
           config.maxLoops.toString(),
           config.llmModel,
           config.searchApi
         ], {
-          cwd: projectRoot,
           env: {
             ...process.env,  // Pass through existing environment variables
-            PYTHONUNBUFFERED: "1"  // Ensure Python output is not buffered
-          }
+            PYTHONUNBUFFERED: "1",  // Ensure Python output is not buffered
+          PYTHONPATH: join(__dirname, "..", "src").replace(/\\/g, "/")  // Add src directory to Python path
+          },
+          cwd: join(__dirname, "..").replace(/\\/g, "/")  // Set working directory to project root
         });
 
         // Collect output using Promise
@@ -182,10 +197,15 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
           }
 
           pythonProcess.on("error", (error: Error) => {
-            reject(error);
+            reject(new Error(`Failed to start Python process: ${error.message}`));
           });
 
           pythonProcess.on("close", (code: number) => {
+            if (code !== 0) {
+              reject(new Error(`Python process exited with code ${code}. Error: ${stderr}`));
+              return;
+            }
+
             try {
               const result = JSON.parse(stdout.trim()) as PythonResponse;
               if (result.error) {
@@ -196,7 +216,7 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
                 resolve('No summary available');
               }
             } catch (e) {
-              reject(new Error(`Failed to parse output: ${stdout}\nError: ${e}\nStderr: ${stderr}`));
+              reject(new Error(`Failed to parse Python output: ${e}\nStdout: ${stdout}\nStderr: ${stderr}`));
             }
           });
         });
@@ -219,11 +239,12 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
           ],
         };
       } catch (error) {
+        const errorMessage = error instanceof Error ? error.message : String(error);
         return {
           content: [
             {
               type: "text",
-              text: `Failed to start research: ${error}`,
+              text: `Research failed: ${errorMessage}`,
             },
           ],
           isError: true,
@@ -263,23 +284,50 @@ Sources: ${currentResearch.sources.join("\n")}`,
       let configMessage = '';
 
       if (newConfig && Object.keys(newConfig).length > 0) {
-        // Type guard to ensure properties match ResearchConfig
-        const validatedConfig: Partial<ResearchConfig> = {};
-        if (typeof newConfig.maxLoops === 'number') {
-          validatedConfig.maxLoops = newConfig.maxLoops;
+        try {
+          // Validate new configuration
+          if (newConfig.maxLoops !== undefined) {
+            if (typeof newConfig.maxLoops !== 'number' || newConfig.maxLoops < 1 || newConfig.maxLoops > 5) {
+              throw new Error("maxLoops must be a number between 1 and 5");
+            }
+          }
+
+          if (newConfig.searchApi !== undefined) {
+            if (newConfig.searchApi !== 'perplexity' && newConfig.searchApi !== 'tavily') {
+              throw new Error("searchApi must be either 'perplexity' or 'tavily'");
+            }
+            // Validate API key for new search API
+            validateApiKeys(newConfig.searchApi);
+          }
+
+          // Type guard to ensure properties match ResearchConfig
+          const validatedConfig: Partial<ResearchConfig> = {};
+          if (typeof newConfig.maxLoops === 'number') {
+            validatedConfig.maxLoops = newConfig.maxLoops;
+          }
+          if (typeof newConfig.llmModel === 'string') {
+            validatedConfig.llmModel = newConfig.llmModel;
+          }
+          if (newConfig.searchApi === 'perplexity' || newConfig.searchApi === 'tavily') {
+            validatedConfig.searchApi = newConfig.searchApi;
+          }
+          
+          config = {
+            ...config,
+            ...validatedConfig
+          };
+          configMessage = 'Research configuration updated:';
+        } catch (error) {
+          return {
+            content: [
+              {
+                type: "text",
+                text: `Configuration error: ${error instanceof Error ? error.message : String(error)}`,
+              },
+            ],
+            isError: true,
+          };
         }
-        if (typeof newConfig.llmModel === 'string') {
-          validatedConfig.llmModel = newConfig.llmModel;
-        }
-        if (newConfig.searchApi === 'perplexity' || newConfig.searchApi === 'tavily') {
-          validatedConfig.searchApi = newConfig.searchApi;
-        }
-        
-        config = {
-          ...config,
-          ...validatedConfig
-        };
-        configMessage = 'Research configuration updated:';
       } else {
         configMessage = 'Current research configuration:';
       }
