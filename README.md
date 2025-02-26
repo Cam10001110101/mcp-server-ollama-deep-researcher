@@ -24,9 +24,10 @@ The server provides research tools that use any LLM hosted by [Ollama](https://o
 - Python 3.10 or higher
 - Compute (CPU/GPU) capable of running your selected Ollama model
 - At least 8GB of RAM for running larger language models
-- API keys for search services:
+- Required API keys:
   - Tavily API key (get one at https://tavily.com)
   - Perplexity API key (get one at https://perplexity.ai)
+  - LangSmith API key (get one at https://smith.langchain.com) for tracing and monitoring
 
 Make sure you can run Node.js and npm from your terminal/command prompt. You can verify your installations with:
 
@@ -55,22 +56,24 @@ npm install
 
 3. Install Python dependencies:
 
-For Windows:
+First, install uv (recommended for better performance and dependency resolution):
 ```bash
-# Using pip
-pip install langgraph langchain-core langchain-ollama tavily-python pplx
+# Windows
+pip install uv
 
-# Or using uv (recommended)
-uv pip install langgraph langchain-core langchain-ollama tavily-python pplx
+# macOS/Linux
+pip3 install uv
 ```
 
-For macOS/Linux:
+Then install project dependencies using pyproject.toml:
 ```bash
-# Using pip
-pip3 install langgraph langchain-core langchain-ollama tavily-python pplx
+uv pip install .
+```
 
-# Or using uv (recommended)
-uv pip install langgraph langchain-core langchain-ollama tavily-python pplx
+Note: This will install the project in editable mode with all dependencies specified in pyproject.toml. If you prefer pip:
+```bash
+pip install .  # Windows
+pip3 install .  # macOS/Linux
 ```
 
 4. Build the TypeScript code:
@@ -96,44 +99,56 @@ For Cline (VS Code Extension):
 - macOS: `~/Library/Application Support/Code/User/globalStorage/saoudrizwan.claude-dev/settings/cline_mcp_settings.json`
 - Linux: `~/.config/Code/User/globalStorage/saoudrizwan.claude-dev/settings/cline_mcp_settings.json`
 
-For Windows:
+Example configuration:
 ```json
 {
   "mcpServers": {
     "ollama-deep-researcher": {
       "command": "node",
-      "args": ["C:\\path\\to\\build\\index.js"],
+      "args": ["path/to/mcp-server-ollama-deep-researcher/build/index.js"],
       "env": {
-        "TAVILY_API_KEY": "your-tavily-key",
+        "LANGSMITH_TRACING": "true",
+        "LANGSMITH_ENDPOINT": "https://api.smith.langchain.com",
+        "LANGSMITH_API_KEY": "your-langsmith-key",
+        "LANGSMITH_PROJECT": "ollama-deep-researcher-mcp-server",
+        "TAVILY_API_KEY": "your-tavily-key",  // Include tvly- prefix
         "PERPLEXITY_API_KEY": "your-perplexity-key",
-        "PYTHONPATH": "C:\\path\\to\\src"
-      },
-      "disabled": false,
-      "autoApprove": []
+        "PYTHONPATH": "path/to/mcp-server-ollama-deep-researcher/src"
+      }
     }
   }
 }
 ```
 
-For macOS/Linux:
+Note: Replace paths with absolute paths for your system:
+- Windows: Use `C:\\Users\\username\\path\\to\\mcp-server-ollama-deep-researcher`
+- macOS/Linux: Use `/Users/username/path/to/mcp-server-ollama-deep-researcher`
+
+For macOS/Linux, you may also want to add:
 ```json
-{
-  "mcpServers": {
-    "ollama-deep-researcher": {
-      "command": "node",
-      "args": ["/path/to/build/index.js"],
-      "env": {
-        "TAVILY_API_KEY": "your-tavily-key",
-        "PERPLEXITY_API_KEY": "your-perplexity-key",
-        "PYTHONPATH": "/path/to/src",
-        "PYTHONUNBUFFERED": "1"
-      },
-      "disabled": false,
-      "autoApprove": []
-    }
-  }
-}
+"PYTHONUNBUFFERED": "1"
 ```
+
+## Tracing and Monitoring
+
+The server integrates with LangSmith for comprehensive tracing and monitoring of the research process:
+
+1. **Operation Tracing**:
+   - All LLM interactions are traced
+   - Web search operations are monitored
+   - Research workflow steps are tracked
+
+2. **Performance Monitoring**:
+   - Response times for each operation
+   - Success/failure rates
+   - Resource utilization
+
+3. **Debugging and Optimization**:
+   - Detailed traces for troubleshooting
+   - Performance bottleneck identification
+   - Query optimization insights
+
+Access all traces at https://smith.langchain.com under your configured project name.
 
 ## Available Tools
 

@@ -88,8 +88,17 @@ def tavily_search(query, include_raw_content=True, max_results=3):
                 - url (str): URL of the search result
                 - content (str): Snippet/summary of the content
                 - raw_content (str): Full content of the page if available"""
-     
-    tavily_client = TavilyClient()
+    
+    # Get API key from environment
+    api_key = os.environ.get('TAVILY_API_KEY')
+    if not api_key:
+        raise ValueError("TAVILY_API_KEY environment variable is required")
+    
+    # Keep the tvly- prefix intact
+    api_key = api_key.strip()
+    
+    # Initialize Tavily client with the full API key
+    tavily_client = TavilyClient(api_key=api_key)
     return tavily_client.search(query, 
                          max_results=max_results, 
                          include_raw_content=include_raw_content)

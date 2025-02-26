@@ -1,4 +1,5 @@
 import json
+import os
 
 from typing_extensions import Literal
 
@@ -6,6 +7,7 @@ from langchain_core.messages import HumanMessage, SystemMessage
 from langchain_core.runnables import RunnableConfig
 from langchain_ollama import ChatOllama
 from langgraph.graph import START, END, StateGraph
+from langsmith import trace
 
 from assistant.configuration import Configuration, SearchAPI
 from assistant.utils import deduplicate_and_format_sources, tavily_search, format_sources, perplexity_search
@@ -15,6 +17,22 @@ from assistant.prompts import query_writer_instructions, summarizer_instructions
 # Nodes   
 def generate_query(state: SummaryState, config: RunnableConfig):
     """ Generate a query for web search """
+    
+    # Add timeout to config
+    if not config:
+        config = {}
+    if "configurable" not in config:
+        config["configurable"] = {}
+    config["configurable"]["timeout"] = 300  # 5 minutes timeout
+    
+    configurable = Configuration.from_runnable_config(config)
+    
+    # Enable tracing if configured
+    if configurable.langsmith_tracing and configurable.langsmith_api_key:
+        os.environ["LANGCHAIN_TRACING_V2"] = "true"
+        os.environ["LANGCHAIN_ENDPOINT"] = configurable.langsmith_endpoint
+        os.environ["LANGCHAIN_API_KEY"] = configurable.langsmith_api_key
+        os.environ["LANGCHAIN_PROJECT"] = configurable.langsmith_project
     
     try:
         # Format the prompt
@@ -42,23 +60,29 @@ def generate_query(state: SummaryState, config: RunnableConfig):
 def web_research(state: SummaryState, config: RunnableConfig):
     """ Gather information from the web """
     
+    # Add timeout to config
+    if not config:
+        config = {}
+    if "configurable" not in config:
+        config["configurable"] = {}
+    config["configurable"]["timeout"] = 300  # 5 minutes timeout
+    
     # Configure 
     configurable = Configuration.from_runnable_config(config)
-
-    # Handle both cases for search_api:
-    # 1. When selected in Studio UI -> returns a string (e.g. "tavily")
-    # 2. When using default -> returns an Enum (e.g. SearchAPI.TAVILY)
-    if isinstance(configurable.search_api, str):
-        search_api = configurable.search_api
-    else:
-        search_api = configurable.search_api.value
+    
+    # Enable tracing if configured
+    if configurable.langsmith_tracing and configurable.langsmith_api_key:
+        os.environ["LANGCHAIN_TRACING_V2"] = "true"
+        os.environ["LANGCHAIN_ENDPOINT"] = configurable.langsmith_endpoint
+        os.environ["LANGCHAIN_API_KEY"] = configurable.langsmith_api_key
+        os.environ["LANGCHAIN_PROJECT"] = configurable.langsmith_project
 
     try:
         # Search the web
-        if search_api == "tavily":
+        if configurable.search_api == SearchAPI.TAVILY:
             search_results = tavily_search(state.search_query, include_raw_content=True, max_results=1)
             search_str = deduplicate_and_format_sources(search_results, max_tokens_per_source=1000, include_raw_content=True)
-        elif search_api == "perplexity":
+        elif configurable.search_api == SearchAPI.PERPLEXITY:
             search_results = perplexity_search(state.search_query, state.research_loop_count)
             search_str = deduplicate_and_format_sources(search_results, max_tokens_per_source=1000, include_raw_content=False)
         else:
@@ -66,7 +90,7 @@ def web_research(state: SummaryState, config: RunnableConfig):
     except Exception as e:
         # If we have a running summary, continue with a note about the error
         if state.running_summary:
-            error_note = f"\n\nNote: Search failed during research loop {state.research_loop_count + 1} using {search_api} API. Error: {str(e)}"
+            error_note = f"\n\nNote: Search failed during research loop {state.research_loop_count + 1} using {configurable.search_api.value} API. Error: {str(e)}"
             return {
                 "sources_gathered": state.sources_gathered + [f"[Search failed in loop {state.research_loop_count + 1}]"],
                 "research_loop_count": state.research_loop_count + 1,
@@ -84,6 +108,22 @@ def web_research(state: SummaryState, config: RunnableConfig):
 
 def summarize_sources(state: SummaryState, config: RunnableConfig):
     """ Summarize the gathered sources """
+    
+    # Add timeout to config
+    if not config:
+        config = {}
+    if "configurable" not in config:
+        config["configurable"] = {}
+    config["configurable"]["timeout"] = 300  # 5 minutes timeout
+    
+    configurable = Configuration.from_runnable_config(config)
+    
+    # Enable tracing if configured
+    if configurable.langsmith_tracing and configurable.langsmith_api_key:
+        os.environ["LANGCHAIN_TRACING_V2"] = "true"
+        os.environ["LANGCHAIN_ENDPOINT"] = configurable.langsmith_endpoint
+        os.environ["LANGCHAIN_API_KEY"] = configurable.langsmith_api_key
+        os.environ["LANGCHAIN_PROJECT"] = configurable.langsmith_project
     
     try:
         # Existing summary
@@ -138,6 +178,22 @@ def summarize_sources(state: SummaryState, config: RunnableConfig):
 def reflect_on_summary(state: SummaryState, config: RunnableConfig):
     """ Reflect on the summary and generate a follow-up query """
 
+    # Add timeout to config
+    if not config:
+        config = {}
+    if "configurable" not in config:
+        config["configurable"] = {}
+    config["configurable"]["timeout"] = 300  # 5 minutes timeout
+    
+    configurable = Configuration.from_runnable_config(config)
+    
+    # Enable tracing if configured
+    if configurable.langsmith_tracing and configurable.langsmith_api_key:
+        os.environ["LANGCHAIN_TRACING_V2"] = "true"
+        os.environ["LANGCHAIN_ENDPOINT"] = configurable.langsmith_endpoint
+        os.environ["LANGCHAIN_API_KEY"] = configurable.langsmith_api_key
+        os.environ["LANGCHAIN_PROJECT"] = configurable.langsmith_project
+    
     try:
         # Generate a query
         configurable = Configuration.from_runnable_config(config)
@@ -194,6 +250,8 @@ def route_research(state: SummaryState, config: RunnableConfig) -> Literal["fina
     
 # Add nodes and edges 
 builder = StateGraph(SummaryState, input=SummaryStateInput, output=SummaryStateOutput, config_schema=Configuration)
+
+# Add nodes with tracing
 builder.add_node("generate_query", generate_query)
 builder.add_node("web_research", web_research)
 builder.add_node("summarize_sources", summarize_sources)
@@ -208,4 +266,5 @@ builder.add_edge("summarize_sources", "reflect_on_summary")
 builder.add_conditional_edges("reflect_on_summary", route_research)
 builder.add_edge("finalize_summary", END)
 
+# Compile the graph
 graph = builder.compile()

@@ -1,206 +1,160 @@
-# Ollama Deep Researcher MCP Server
+# Ollama Deep Researcher Architecture
 
 ## Overview
-The Ollama Deep Researcher MCP server provides an interface for conducting deep research on topics using a combination of web search APIs (Tavily and Perplexity) and local LLM processing through Ollama. It uses langgraph for orchestrating the research workflow.
 
-## Architecture
+The Ollama Deep Researcher is a Model Context Protocol (MCP) server that provides deep research capabilities using local LLMs via Ollama. The system integrates multiple components to enable efficient research, tracing, and monitoring.
 
-### Components
+## Core Components
 
-1. **MCP Server (TypeScript)**
-   - Handles MCP protocol communication
-   - Manages configuration and state
-   - Coordinates with Python research module
-   - Provides tools for research, status, and configuration
+### 1. Research Engine
+- Implements iterative research workflow using LangGraph
+- Manages state transitions between research phases
+- Handles query generation and result synthesis
 
-2. **Research Module (Python)**
-   - Uses langgraph for workflow orchestration
-   - Integrates with Ollama for local LLM processing
-   - Handles web search through Tavily/Perplexity APIs
-   - Processes and synthesizes research results
+### 2. Search Integration
+- Supports multiple search providers (Perplexity, Tavily)
+- Abstracts search API interactions
+- Handles rate limiting and error recovery
 
-### Workflow
-1. User initiates research through MCP client
-2. Server validates configuration and API keys
-3. Python module executes research workflow:
-   - Generate search queries
-   - Gather information from web
-   - Synthesize results with local LLM
-   - Iterate for deeper insights
-4. Results are returned through MCP protocol
+### 3. LLM Integration
+- Connects to Ollama for local LLM access
+- Manages model loading and inference
+- Handles prompt engineering and response parsing
 
-## Dependencies
+### 4. Tracing System
+- LangSmith integration for comprehensive tracing
+- Monitors all LLM operations and search requests
+- Provides performance metrics and debugging tools
 
-### System Requirements
-- Node.js (for running the MCP server)
-- Python 3.10 or higher
-- Compute (CPU/GPU) capable of running Ollama models
-- At least 8GB of RAM for larger models
+## Data Flow
 
-### TypeScript (MCP Server)
-- @modelcontextprotocol/sdk
-- Node.js standard libraries
-
-### Python (Research Module)
-- langgraph
-- langchain-core
-- langchain-ollama
-- tavily-python
-- pplx
-
-Python dependencies can be installed using pip or uv:
-
-For Windows:
-```bash
-# Using pip
-pip install langgraph langchain-core langchain-ollama tavily-python pplx
-
-# Or using uv (recommended)
-uv pip install langgraph langchain-core langchain-ollama tavily-python pplx
+```mermaid
+graph TD
+    A[User Query] --> B[Query Generator]
+    B --> C[Search Engine]
+    C --> D[Result Processor]
+    D --> E[Summary Generator]
+    E --> F[Knowledge Gap Analyzer]
+    F --> G{Continue Research?}
+    G -->|Yes| B
+    G -->|No| H[Final Summary]
+    
+    subgraph "Tracing Layer"
+        I[LangSmith Tracer]
+        I -.-> B
+        I -.-> C
+        I -.-> D
+        I -.-> E
+        I -.-> F
+    end
 ```
 
-For macOS/Linux:
-```bash
-# Using pip
-pip3 install langgraph langchain-core langchain-ollama tavily-python pplx
+## Key Features
 
-# Or using uv (recommended)
-uv pip install langgraph langchain-core langchain-ollama tavily-python pplx
-```
+### 1. Configurable Research Parameters
+- Maximum research loops
+- LLM model selection
+- Search API selection
+- Timeout settings
+
+### 2. Performance Monitoring
+- Operation latency tracking
+- Resource utilization metrics
+- Error rate monitoring
+- Query performance analysis
+
+### 3. Error Handling
+- Graceful degradation
+- Automatic retries
+- Fallback strategies
+- Clear error reporting
+
+## Implementation Details
+
+### Research Workflow
+1. Query Generation
+   - Uses LLM to create targeted search queries
+   - Incorporates context from previous iterations
+   - Tracked via LangSmith for optimization
+
+2. Web Search
+   - Configurable search provider
+   - Result deduplication
+   - Source validation
+   - Performance monitoring
+
+3. Result Synthesis
+   - Incremental summary updates
+   - Source tracking
+   - Citation management
+   - Quality metrics
+
+### Tracing Implementation
+
+The system uses LangSmith for comprehensive tracing:
+
+1. Operation Tracing
+   ```python
+   @traceable
+   def tavily_search(query, include_raw_content=True, max_results=3):
+       tavily_client = TavilyClient()
+       return tavily_client.search(query, 
+                            max_results=max_results, 
+                            include_raw_content=include_raw_content)
+   ```
+
+2. Performance Monitoring
+   - Response time tracking
+   - Resource utilization
+   - Error rate monitoring
+   - Query optimization
+
+3. Debug Capabilities
+   - Step-by-step workflow tracing
+   - Input/output inspection
+   - Error context capture
+   - Performance bottleneck identification
 
 ## Configuration
 
-The server is configured through the MCP client configuration file.
-
-Required Environment Variables:
-- `TAVILY_API_KEY`: For Tavily search API
-- `PERPLEXITY_API_KEY`: For Perplexity search API
-- `PYTHONPATH`: Path to the src directory for Python module imports
-- `PYTHONUNBUFFERED`: Set to "1" to prevent Python output buffering
-
-Example configuration for Windows:
-```json
-{
-  "mcpServers": {
-    "ollama-deep-researcher": {
-      "command": "node",
-      "args": ["C:\\path\\to\\build\\index.js"],
-      "env": {
-        "TAVILY_API_KEY": "your-tavily-key",
-        "PERPLEXITY_API_KEY": "your-perplexity-key",
-        "PYTHONPATH": "C:\\path\\to\\src",
-        "PYTHONUNBUFFERED": "1"
-      }
-    }
-  }
-}
-```
-
-Example configuration for macOS/Linux:
-```json
-{
-  "mcpServers": {
-    "ollama-deep-researcher": {
-      "command": "node",
-      "args": ["/path/to/build/index.js"],
-      "env": {
-        "TAVILY_API_KEY": "your-tavily-key",
-        "PERPLEXITY_API_KEY": "your-perplexity-key",
-        "PYTHONPATH": "/path/to/src",
-        "PYTHONUNBUFFERED": "1"
-      }
-    }
-  }
-}
-```
-
-## Tools
-
-### 1. research
-Research any topic using web search and LLM synthesis.
-```json
-{
-  "name": "research",
-  "arguments": {
-    "topic": "quantum computing basics"
-  }
-}
-```
-
-### 2. get_status
-Get the current status of ongoing research.
-```json
-{
-  "name": "get_status",
-  "arguments": {
-    "_dummy": "dummy"
-  }
-}
-```
-
-### 3. configure
-Configure research parameters.
-```json
-{
-  "name": "configure",
-  "arguments": {
-    "maxLoops": 3,
-    "llmModel": "deepseek-r1:1.5b",
-    "searchApi": "tavily"
-  }
-}
-```
-
-### Configuration Options
-
-- **maxLoops**: Number of research iterations (1-5)
-- **llmModel**: Ollama model to use (e.g., "deepseek-r1:1.5b", "llama3.2")
-- **searchApi**: Search API to use ("perplexity" or "tavily")
-
-## Error Handling
-
-The server includes comprehensive error handling for:
-- Missing or invalid API keys
-- Python process failures
-- Configuration validation
-- Search API errors
-- LLM processing issues
-
-## Development
-
-The project uses:
-- TypeScript for MCP server implementation
-- Python for research workflow
-- uv for Python dependency management
-- npm for TypeScript/Node.js management
-
-### Building from Source
-
-1. Ensure Node.js is properly installed and in your system PATH:
+### Environment Variables
 ```bash
-node --version  # Should display version number
+LANGSMITH_TRACING=true
+LANGSMITH_ENDPOINT="https://api.smith.langchain.com"
+LANGSMITH_API_KEY="your-api-key"
+LANGSMITH_PROJECT="ollama-deep-researcher-mcp-server"
+TAVILY_API_KEY="tvly-your-key"  # Include tvly- prefix
+PERPLEXITY_API_KEY="pplx-your-key"
 ```
 
-2. Build the project:
-```bash
-npm run build
+### Default Settings
+```json
+{
+  "maxLoops": 3,
+  "llmModel": "deepseek-r1:1.5b",
+  "searchApi": "perplexity",
+  "timeout": 300
+}
 ```
 
-### Platform-Specific Considerations
+## Future Enhancements
 
-Windows:
-- Use backslashes in paths (or escape forward slashes)
-- Python command is typically `python`
-- Check PATH variables in System Properties
+1. Advanced Tracing
+   - Custom trace aggregation
+   - Advanced performance analytics
+   - Automated optimization suggestions
 
-macOS/Linux:
-- Use forward slashes in paths
-- Python command is typically `python3`
-- Set PATH in ~/.bashrc or ~/.zshrc
+2. Search Optimization
+   - Dynamic provider selection
+   - Improved result ranking
+   - Enhanced deduplication
 
-If you encounter "'node' is not recognized" errors:
-1. Verify Node.js installation
-2. Add Node.js to system PATH:
-   - Windows: Edit system environment variables → Environment Variables → Path → Add Node.js installation directory
-   - macOS/Linux: Usually handled by the installer
-3. Restart your terminal/computer
+3. LLM Improvements
+   - Model performance tracking
+   - Automated prompt optimization
+   - Response quality metrics
+
+4. System Scalability
+   - Parallel research workflows
+   - Distributed tracing
+   - Enhanced resource management

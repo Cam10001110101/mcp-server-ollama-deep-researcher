@@ -167,13 +167,19 @@ const scriptPath = join(__dirname, "..", "src", "assistant", "run_research.py").
           env: {
             ...process.env,  // Pass through existing environment variables
             PYTHONUNBUFFERED: "1",  // Ensure Python output is not buffered
-          PYTHONPATH: join(__dirname, "..", "src").replace(/\\/g, "/")  // Add src directory to Python path
+            PYTHONPATH: join(__dirname, "..", "src").replace(/\\/g, "/"),  // Add src directory to Python path
+            TAVILY_API_KEY: process.env.TAVILY_API_KEY || "",  // Ensure API key is passed to Python process
+            PERPLEXITY_API_KEY: process.env.PERPLEXITY_API_KEY || ""  // Ensure API key is passed to Python process
           },
           cwd: join(__dirname, "..").replace(/\\/g, "/")  // Set working directory to project root
         });
 
-        // Collect output using Promise
+        // Collect output using Promise with 5 minute timeout
         const output = await new Promise<string>((resolve, reject) => {
+          const timeout = setTimeout(() => {
+            pythonProcess.kill();
+            reject(new Error('Research process timed out after 5 minutes'));
+          }, 300000); // 5 minutes
           let stdout = '';
           let stderr = '';
 
@@ -201,6 +207,7 @@ const scriptPath = join(__dirname, "..", "src", "assistant", "run_research.py").
           });
 
           pythonProcess.on("close", (code: number) => {
+            clearTimeout(timeout);
             if (code !== 0) {
               reject(new Error(`Python process exited with code ${code}. Error: ${stderr}`));
               return;

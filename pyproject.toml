@@ -1,0 +1,16 @@
+[project]
+name = "ollama-deep-researcher"
+version = "1.0.0"
+description = "MCP server for deep research using Ollama LLMs"
+requires-python = ">=3.10"
+dependencies = [
+    "langgraph>=0.0.20",
+    "langchain-core>=0.1.22",
+    "langchain-ollama>=0.0.1",
+    "tavily-python>=0.5.1",
+    "pplx>=0.0.1"
+]
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
