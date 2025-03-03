@@ -1,7 +1,15 @@
 #!/usr/bin/env node
 import { Server } from "@modelcontextprotocol/sdk/server/index.js";
 import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
-import { ListToolsRequestSchema, CallToolRequestSchema } from "@modelcontextprotocol/sdk/types.js";
+import { 
+  ListToolsRequestSchema, 
+  CallToolRequestSchema,
+  ListResourcesRequestSchema,
+  ListResourceTemplatesRequestSchema,
+  ReadResourceRequestSchema,
+  ErrorCode,
+  McpError
+} from "@modelcontextprotocol/sdk/types.js";
 import { spawn, ChildProcess } from "child_process";
 import { dirname, join } from "path";
 import { fileURLToPath } from "url";
@@ -14,6 +22,16 @@ interface PythonResponse {
   error?: string;
 }
 
+// Track completed research results
+interface ResearchResult {
+  topic: string;
+  summary: string;
+  sources: string[];
+  timestamp: string;
+}
+
+const researchResults: Map<string, ResearchResult> = new Map();
+
 // Track active research state
 interface ResearchState {
   topic: string;
@@ -24,6 +42,11 @@ interface ResearchState {
 }
 
 let currentResearch: ResearchState | null = null;
+
+// Helper to generate URI-safe topic name
+function topicToUri(topic: string): string {
+  return encodeURIComponent(topic.toLowerCase().replace(/\s+/g, '-'));
+}
 
 // Track configuration
 interface ResearchConfig {
@@ -58,6 +81,9 @@ const server = new Server(
     capabilities: {
       tools: {
         method: "tools/list"
+      },
+      resources: {
+        method: "resources/list"
       }
     }
   }
@@ -228,6 +254,15 @@ const scriptPath = join(__dirname, "..", "src", "assistant", "run_research.py").
           });
         });
 
+        // Store completed research result
+        const result: ResearchResult = {
+          topic,
+          summary: output,
+          sources: [],
+          timestamp: new Date().toISOString()
+        };
+        researchResults.set(topicToUri(topic), result);
+
         // Update research state
         currentResearch = {
           topic,
@@ -363,6 +398,61 @@ Search API: ${config.searchApi}`,
         isError: true,
       };
   }
+});
+
+// Handle resource listing
+server.setRequestHandler(ListResourcesRequestSchema, async () => {
+  const resources = Array.from(researchResults.entries()).map(([uri, result]) => ({
+    uri: `research://${uri}`,
+    name: result.topic,
+    description: `Research results for "${result.topic}" from ${new Date(result.timestamp).toLocaleString()}`,
+    mimeType: "application/json"
+  }));
+
+  return { resources };
+});
+
+// Handle resource templates
+server.setRequestHandler(ListResourceTemplatesRequestSchema, async () => ({
+  resourceTemplates: [
+    {
+      uriTemplate: "research://{topic}",
+      name: "Research Results by Topic",
+      description: "Access research results for a specific topic",
+      mimeType: "application/json"
+    }
+  ]
+}));
+
+// Handle resource reading
+server.setRequestHandler(ReadResourceRequestSchema, async (request) => {
+  const match = request.params.uri.match(/^research:\/\/(.+)$/);
+  if (!match) {
+    throw new McpError(
+      ErrorCode.InvalidRequest,
+      `Invalid research URI format: ${request.params.uri}`
+    );
+  }
+
+  const topic = decodeURIComponent(match[1]);
+  const result = researchResults.get(topic);
+
+  if (!result) {
+    throw new McpError(
+      ErrorCode.MethodNotFound,
+      `No research found for topic: ${topic}`
+    );
+  }
+
+  return {
+    contents: [
+      {
+        uri: request.params.uri,
+        mimeType: "application/json",
+        text: JSON.stringify(result, null, 2)
+      }
+    ]
+  };
 });
 
 // Initialize and run the server

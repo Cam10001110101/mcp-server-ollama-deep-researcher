@@ -4,7 +4,10 @@ This is a Model Context Protocol (MCP) server adaptation of [LangChain Ollama De
 
 ## Core Functionality
 
-The server provides research tools that use any LLM hosted by [Ollama](https://ollama.com). Given a topic, it will:
+The server provides research capabilities through MCP tools and resources, using any LLM hosted by [Ollama](https://ollama.com).
+
+### Research Process
+Given a topic, it will:
 
 1. Generate a web search query
 2. Gather web search results via [Tavily](https://www.tavily.com/) or [Perplexity API](https://www.perplexity.ai/hub/faq/pplx-api)
@@ -149,6 +152,25 @@ The server integrates with LangSmith for comprehensive tracing and monitoring of
    - Query optimization insights
 
 Access all traces at https://smith.langchain.com under your configured project name.
+
+## MCP Resources
+
+Research results are automatically stored as MCP resources, enabling:
+
+1. **Persistent Access**
+   - Results accessible via `research://{topic}` URIs
+   - Automatic storage of completed research
+   - JSON-formatted content with metadata
+
+2. **Resource Panel Integration**
+   - Research appears in MCP client's resource panel
+   - Easy access to past research topics
+   - Timestamp and description for each result
+
+3. **Context Management**
+   - Efficient reuse of research in conversations
+   - Reduced token usage through resource references
+   - Selective inclusion of research context
 
 ## Available Tools
 
@@ -337,6 +359,12 @@ The server provides clear error messages for:
 
 For detailed information about the server's architecture and implementation, see [.context/index.md](.context/index.md).
 
+## Glama.ai Badge
+<a href="https://glama.ai/mcp/servers/r25SSxqOci">
+  <img width="380" height="200" src="https://glama.ai/mcp/servers/r25SSxqOci/badge" />
+</a>   
+
+  
 
 
 

@@ -6,7 +6,13 @@ The Ollama Deep Researcher is a Model Context Protocol (MCP) server that provide
 
 ## Core Components
 
-### 1. Research Engine
+### 1. MCP Resources
+- Persistent storage of research results
+- Resource URI system for accessing past research
+- Structured content display in MCP clients
+- Efficient context management through resource references
+
+### 2. Research Engine
 - Implements iterative research workflow using LangGraph
 - Manages state transitions between research phases
 - Handles query generation and result synthesis
@@ -70,6 +76,22 @@ graph TD
 - Clear error reporting
 
 ## Implementation Details
+
+### Resource Management
+1. Storage
+   - Research results stored with URI-safe topic names
+   - JSON-formatted content with metadata
+   - Timestamp tracking for result freshness
+
+2. Access
+   - Dynamic URI templates for flexible retrieval
+   - Resource listing for discovery
+   - Error handling for missing resources
+
+3. Integration
+   - Automatic resource creation after research
+   - Resource panel display in MCP clients
+   - Efficient context reuse in conversations
 
 ### Research Workflow
 1. Query Generation

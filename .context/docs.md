@@ -1,6 +1,59 @@
 # API Documentation
 
-This document provides detailed documentation for the MCP tools provided by the Ollama Deep Researcher server.
+This document provides detailed documentation for the MCP tools and resources provided by the Ollama Deep Researcher server.
+
+## Resources
+
+### Resource URI Format
+```
+research://{topic}
+```
+
+### Resource Content Schema
+```typescript
+{
+  type: "object",
+  properties: {
+    topic: {
+      type: "string",
+      description: "Original research topic"
+    },
+    summary: {
+      type: "string",
+      description: "Research findings and synthesis"
+    },
+    sources: {
+      type: "array",
+      items: { type: "string" },
+      description: "Sources used in research"
+    },
+    timestamp: {
+      type: "string",
+      format: "date-time",
+      description: "When the research was completed"
+    }
+  }
+}
+```
+
+### Resource Listing
+Resources appear in the MCP client's resource panel with:
+- Name: Original research topic
+- Description: Research completion timestamp
+- URI: `research://{url-safe-topic}`
+- MIME Type: application/json
+
+### Resource Templates
+The server provides a template for accessing research by topic:
+- Template: `research://{topic}`
+- Description: Access research results for any topic
+- Parameters:
+  - topic: URL-safe version of research topic
+
+### Error Handling
+- Invalid URI format: Returns InvalidRequest error
+- Resource not found: Returns MethodNotFound error
+- Server error: Returns InternalError error
 
 ## Tool: configure
 
