@@ -57,7 +57,7 @@ interface ResearchConfig {
 
 let config: ResearchConfig = {
   maxLoops: 3,
-  llmModel: "deepseek-r1:1.5b",
+  llmModel: "deepseek-r1:8b",
   searchApi: "tavily"
 };
 

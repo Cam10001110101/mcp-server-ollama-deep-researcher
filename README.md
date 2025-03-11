@@ -48,6 +48,8 @@ If these commands fail, you may need to:
 
 ## Installation
 
+### Option 1: Standard Installation
+
 1. Download and install [Ollama](https://ollama.com/download) for your platform
 
 2. Clone this repository and install dependencies:
@@ -89,6 +91,60 @@ npm run build
 ollama pull deepseek-r1:8b
 ```
 
+### Option 2: Docker Installation
+
+You can also run the MCP server using Docker, which simplifies the setup process.
+
+1. Download and install [Docker](https://www.docker.com/products/docker-desktop/) for your platform
+
+2. Clone this repository:
+```bash
+git clone https://github.com/Cam10001110101/mcp-server-ollama-deep-researcher
+cd mcp-server-ollama-deep-researcher
+```
+
+3. Create a `.env` file with your API keys (you can copy from `.env.example`):
+```bash
+cp .env.example .env
+# Edit the .env file with your API keys
+```
+
+4. Make the helper script executable:
+```bash
+chmod +x run-docker.sh
+```
+
+5. Build and run the Docker container:
+```bash
+./run-docker.sh start
+```
+
+6. Ensure Ollama is running on your host machine:
+```bash
+ollama pull deepseek-r1:8b  # or your preferred model
+ollama serve
+```
+
+The helper scripts provide several commands:
+
+For macOS/Linux (using run-docker.sh):
+- `./run-docker.sh start` - Build and start the Docker container
+- `./run-docker.sh stop` - Stop the Docker container
+- `./run-docker.sh restart` - Restart the Docker container
+- `./run-docker.sh logs` - Show logs from the Docker container
+- `./run-docker.sh status` - Check the status of the Docker container
+- `./run-docker.sh help` - Show help message
+
+For Windows (using run-docker.bat):
+- `run-docker.bat start` - Build and start the Docker container
+- `run-docker.bat stop` - Stop the Docker container
+- `run-docker.bat restart` - Restart the Docker container
+- `run-docker.bat logs` - Show logs from the Docker container
+- `run-docker.bat status` - Check the status of the Docker container
+- `run-docker.bat help` - Show help message
+
+Note: The Docker container is configured to connect to Ollama running on your host machine. If you want to run Ollama in a container as well, uncomment the Ollama service in the docker-compose.yml file.
+
 ## Client Configuration
 
 Add the server to your MCP client configuration:
@@ -102,7 +158,8 @@ For Cline (VS Code Extension):
 - macOS: `~/Library/Application Support/Code/User/globalStorage/saoudrizwan.claude-dev/settings/cline_mcp_settings.json`
 - Linux: `~/.config/Code/User/globalStorage/saoudrizwan.claude-dev/settings/cline_mcp_settings.json`
 
-Example configuration:
+### Option 1: Standard Installation Configuration
+
 ```json
 {
   "mcpServers": {
@@ -131,6 +188,24 @@ For macOS/Linux, you may also want to add:
 ```json
 "PYTHONUNBUFFERED": "1"
 ```
+
+### Option 2: Docker Installation Configuration
+
+If you're using the Docker container, you can configure the MCP client to connect to the running container:
+
+```json
+{
+  "mcpServers": {
+    "ollama-deep-researcher": {
+      "command": "docker",
+      "args": ["exec", "-i", "ollama-deep-researcher-mcp", "node", "build/index.js"],
+      "env": {}
+    }
+  }
+}
+```
+
+This configuration assumes the Docker container is running. The environment variables are already set in the Docker container, so you don't need to specify them in the MCP client configuration.
 
 ## Tracing and Monitoring
 
@@ -321,6 +396,21 @@ Here are solutions to common issues you might encounter:
 ```bash
 npx @modelcontextprotocol/inspector node path/to/server/index.js --model llama3.2 --max-loops 3 --search-api tavily
 ```
+
+### Docker Issues
+
+- If you're having issues with the Docker container:
+  - Check if the container is running: `docker ps`
+  - View container logs: `docker logs ollama-deep-researcher-mcp`
+  - Ensure your `.env` file contains valid API keys
+  - Verify Ollama is running on your host machine and accessible from the container
+  - If using host.docker.internal doesn't work, try using your host machine's IP address in the OLLAMA_BASE_URL environment variable
+  - For network issues between containers, ensure they're on the same Docker network
+
+- If you're running Ollama in a container:
+  - Uncomment the Ollama service in docker-compose.yml
+  - Ensure the Ollama container has enough resources allocated
+  - Pull the model in the Ollama container: `docker exec -it ollama ollama pull deepseek-r1:8b`
 
 ### Build Issues
 

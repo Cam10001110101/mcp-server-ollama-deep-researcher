@@ -11,9 +11,10 @@ class SearchAPI(Enum):
     PERPLEXITY = "perplexity"
     TAVILY = "tavily"
 
-@dataclass(kw_only=True)
+@dataclass
 class Configuration:
     """The configurable fields for the research assistant."""
+    # Required fields with defaults
     max_web_research_loops: int = 3
     local_llm: str = "llama3.2"
     ollama_base_url: str = "http://localhost:11434"  # Add Ollama base URL

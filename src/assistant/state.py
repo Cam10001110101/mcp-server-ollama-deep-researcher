@@ -2,7 +2,7 @@ import operator
 from dataclasses import dataclass, field
 from typing_extensions import TypedDict, Annotated
 
-@dataclass(kw_only=True)
+@dataclass
 class SummaryState:
     research_topic: str = field(default=None) # Report topic     
     search_query: str = field(default=None) # Search query
@@ -11,10 +11,10 @@ class SummaryState:
     research_loop_count: int = field(default=0) # Research loop count
     running_summary: str = field(default=None) # Final report
 
-@dataclass(kw_only=True)
+@dataclass
 class SummaryStateInput:
     research_topic: str = field(default=None) # Report topic     
 
-@dataclass(kw_only=True)
+@dataclass
 class SummaryStateOutput:
     running_summary: str = field(default=None) # Final report

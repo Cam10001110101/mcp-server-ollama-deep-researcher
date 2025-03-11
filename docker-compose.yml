@@ -1,0 +1,46 @@
+version: '3.8'
+
+services:
+  mcp-server:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: ollama-deep-researcher-mcp
+    tty: true
+    stdin_open: true
+    environment:
+      - TAVILY_API_KEY=${TAVILY_API_KEY:-}
+      - PERPLEXITY_API_KEY=${PERPLEXITY_API_KEY:-}
+      - OLLAMA_BASE_URL=${OLLAMA_BASE_URL:-http://host.docker.internal:11434}
+    volumes:
+      # Mount the source code for development (optional)
+      # - ./src:/app/src
+      # Mount a volume for persistent data (optional)
+      - mcp-data:/app/data
+    # Use host network to easily connect to Ollama running on the host
+    # This is an alternative to using host.docker.internal
+    network_mode: "host"
+    # If using Ollama as a separate container, use this instead:
+    # depends_on:
+    #   - ollama
+    # networks:
+    #   - mcp-network
+
+  # Uncomment to run Ollama as a container
+  # ollama:
+  #   image: ollama/ollama:latest
+  #   container_name: ollama
+  #   volumes:
+  #     - ollama-data:/root/.ollama
+  #   ports:
+  #     - "11434:11434"
+  #   networks:
+  #     - mcp-network
+
+volumes:
+  mcp-data:
+  # ollama-data:
+
+# networks:
+#   mcp-network:
+#     driver: bridge
