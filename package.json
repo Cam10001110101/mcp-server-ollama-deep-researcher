@@ -10,7 +10,7 @@
     "@modelcontextprotocol/sdk": "latest",
     "@types/dotenv": "^6.1.1",
     "dotenv": "^16.4.7",
-    "langsmith": "^0.3.11"
+    "langsmith": "^0.3.29"
   },
   "devDependencies": {
     "@types/node": "^20.0.0",
