@@ -1,0 +1,98 @@
+{
+  "name": "Ollama Deep Researcher",
+  "short_name": "ollama-deep-researcher",
+  "description": "Research any topic using web search and LLM synthesis via a local MCP server. Supports advanced configuration, status tracking, and resource access.",
+  "version": "1.0.0",
+  "dxt_version": "1.0.0",
+  "author": {
+    "name": "Your Name or Organization",
+    "email": "your@email.com"
+  },
+  "homepage_url": "https://github.com/anthropics/dxt",
+  "license": "MIT",
+  "categories": ["research", "AI", "MCP", "desktop-extension"],
+  "entrypoint": "src/index.ts",
+  "server": {
+    "type": "node",
+    "entry_point": "src/index.ts",
+    "mcp_config": {
+      "protocol": "stdio",
+      "entry_point": "src/index.ts",
+      "command": "node src/index.ts"
+    }
+  },
+  "mcp": {
+    "protocol": "stdio",
+    "server": "src/index.ts",
+    "tools": [
+      {
+        "name": "research",
+        "description": "Research a topic using web search and LLM synthesis",
+        "inputSchema": {
+          "type": "object",
+          "properties": {
+            "topic": {
+              "type": "string",
+              "description": "The topic to research"
+            }
+          },
+          "required": ["topic"]
+        }
+      },
+      {
+        "name": "get_status",
+        "description": "Get the current status of any ongoing research",
+        "inputSchema": {
+          "type": "object",
+          "properties": {
+            "_dummy": {
+              "type": "string",
+              "description": "No parameters needed",
+              "const": "dummy"
+            }
+          },
+          "required": ["_dummy"],
+          "additionalProperties": false
+        }
+      },
+      {
+        "name": "configure",
+        "description": "Configure the research parameters (max loops, LLM model, search API)",
+        "inputSchema": {
+          "type": "object",
+          "properties": {
+            "maxLoops": {
+              "type": "number",
+              "description": "Maximum number of research loops (1-5)"
+            },
+            "llmModel": {
+              "type": "string",
+              "description": "Ollama model to use (e.g. llama3.2)"
+            },
+            "searchApi": {
+              "type": "string",
+              "enum": ["perplexity", "tavily"],
+              "description": "Search API to use for web research"
+            }
+          },
+          "required": []
+        }
+      }
+    ],
+    "resources": [
+      {
+        "uriTemplate": "research://{topic}",
+        "name": "Research Results by Topic",
+        "description": "Access research results for a specific topic",
+        "mimeType": "application/json"
+      }
+    ]
+  },
+  "dxt": {
+    "type": "DXT",
+    "api_version": "1.0.0",
+    "platforms": ["desktop"],
+    "permissions": [],
+    "icon": "icon.png"
+  }
+}
