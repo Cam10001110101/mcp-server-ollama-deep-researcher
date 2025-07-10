@@ -1,3 +1,5 @@
+[![MseeP.ai Security Assessment Badge](https://mseep.net/pr/cam10001110101-mcp-server-ollama-deep-researcher-badge.png)](https://mseep.ai/app/cam10001110101-mcp-server-ollama-deep-researcher)
+
 # Ollama Deep Researcher DXT Extension
 
 ## Overview
