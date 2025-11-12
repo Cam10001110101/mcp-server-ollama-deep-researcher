@@ -13,7 +13,7 @@ COPY src/index.ts ./src/
 RUN npm run build
 
 # Use Python image for the final stage
-FROM python:3.11-slim
+FROM python:3.14.0rc1-slim
 
 # Set working directory
 WORKDIR /app
