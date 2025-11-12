@@ -4,7 +4,7 @@
 
 **Ollama Deep Researcher** is a Desktop Extension (DXT) that enables advanced topic research using web search and LLM synthesis, powered by a local MCP server. It supports configurable research parameters, status tracking, and resource access, and is designed for seamless integration with the DXT ecosystem.
 
-- **Research any topic** using web search APIs and LLMs (Ollama, DeepSeek, etc.)
+- **Research any topic** using web search APIs (Tavily, Perplexity, Exa) and LLMs (Ollama, DeepSeek, etc.)
 - **Configure** max research loops, LLM model, and search API
 - **Track status** of ongoing research
 - **Access research results** as resources via MCP protocol
@@ -48,10 +48,12 @@
 3. **Set required environment variables** for web search APIs:
    - For Tavily: `TAVILY_API_KEY`
    - For Perplexity: `PERPLEXITY_API_KEY`
+   - For Exa: `EXA_API_KEY` (Get yours at https://dashboard.exa.ai/api-keys)
    - Example:
      ```sh
      export TAVILY_API_KEY=your_tavily_key
      export PERPLEXITY_API_KEY=your_perplexity_key
+     export EXA_API_KEY=your_exa_key
      ```
 
 4. **Build the TypeScript server** (if needed):
@@ -98,9 +100,15 @@ See `manifest.json` for the full DXT manifest, including tool schemas and resour
 
 ## Troubleshooting
 
-- **Missing API key:** Ensure `TAVILY_API_KEY` or `PERPLEXITY_API_KEY` is set in your environment.
+- **Missing API key:** Ensure `TAVILY_API_KEY`, `PERPLEXITY_API_KEY`, or `EXA_API_KEY` is set in your environment depending on which search API you're using.
 - **Python errors:** Check Python dependencies and logs in `stderr`.
 - **Timeouts:** Research subprocesses are limited to 5 minutes.
+
+## Search API Comparison
+
+- **Tavily:** Fast, comprehensive web search with raw content extraction
+- **Perplexity:** AI-powered search with natural language summaries and citations
+- **Exa:** Neural search engine optimized for semantic search with highlights
 
 ## References
 
@@ -111,4 +119,3 @@ See `manifest.json` for the full DXT manifest, including tool schemas and resour
 
 ---
 
-© 2025 Your Name or Organization. Licensed under MIT.

@@ -10,7 +10,7 @@ from langgraph.graph import START, END, StateGraph
 from langsmith import trace
 
 from assistant.configuration import Configuration, SearchAPI
-from assistant.utils import deduplicate_and_format_sources, tavily_search, format_sources, perplexity_search
+from assistant.utils import deduplicate_and_format_sources, tavily_search, format_sources, perplexity_search, exa_search
 from assistant.state import SummaryState, SummaryStateInput, SummaryStateOutput
 from assistant.prompts import query_writer_instructions, summarizer_instructions, reflection_instructions
 
@@ -85,6 +85,9 @@ def web_research(state: SummaryState, config: RunnableConfig):
         elif configurable.search_api == SearchAPI.PERPLEXITY:
             search_results = perplexity_search(state.search_query, state.research_loop_count)
             search_str = deduplicate_and_format_sources(search_results, max_tokens_per_source=1000, include_raw_content=False)
+        elif configurable.search_api == SearchAPI.EXA:
+            search_results = exa_search(state.search_query, max_results=3)
+            search_str = deduplicate_and_format_sources(search_results, max_tokens_per_source=1000, include_raw_content=True)
         else:
             raise ValueError(f"Unsupported search API: {configurable.search_api}")
     except Exception as e:

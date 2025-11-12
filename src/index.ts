@@ -52,12 +52,12 @@ function topicToUri(topic: string): string {
 interface ResearchConfig {
   maxLoops: number;
   llmModel: string;
-  searchApi: "perplexity" | "tavily";
+  searchApi: "perplexity" | "tavily" | "exa";
 }
 
 let config: ResearchConfig = {
-  maxLoops: 3,
-  llmModel: "deepseek-r1:latest",
+  maxLoops: 7,
+  llmModel: "kimi-k2-thinking:cloud",
   searchApi: "tavily"
 };
 
@@ -68,6 +68,9 @@ function validateApiKeys(searchApi: string): void {
   }
   if (searchApi === "perplexity" && !process.env.PERPLEXITY_API_KEY) {
     throw new Error("PERPLEXITY_API_KEY is required when using Perplexity search API");
+  }
+  if (searchApi === "exa" && !process.env.EXA_API_KEY) {
+    throw new Error("EXA_API_KEY is required when using Exa search API");
   }
 }
 
@@ -130,7 +133,7 @@ server.setRequestHandler(ListToolsRequestSchema, async () => {
         properties: {
           maxLoops: {
             type: "number",
-            description: "Maximum number of research loops (1-5)"
+            description: "Maximum number of research loops (1-10)"
           },
           llmModel: {
             type: "string",
@@ -138,7 +141,7 @@ server.setRequestHandler(ListToolsRequestSchema, async () => {
           },
           searchApi: {
             type: "string",
-            enum: ["perplexity", "tavily"],
+            enum: ["perplexity", "tavily", "exa"],
             description: "Search API to use for web research"
           }
         },
@@ -172,18 +175,20 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
         validateApiKeys(config.searchApi);
 
         // Validate max loops
-        if (config.maxLoops < 1 || config.maxLoops > 5) {
-          throw new Error("maxLoops must be between 1 and 5");
+        if (config.maxLoops < 1 || config.maxLoops > 10) {
+          throw new Error("maxLoops must be between 1 and 10");
         }
 
-        // Use Python from system path
-        const pythonPath = process.platform === "win32" ? "python" : "python3";
+        // Use UV to run Python with the correct virtual environment
+        const uvPath = "uv";
 
         // Get absolute path to Python script from src directory
 const scriptPath = join(__dirname, "..", "src", "assistant", "run_research.py").replace(/\\/g, "/");
 
-        // Run the research script with arguments
-        const pythonProcess: ChildProcess = spawn(pythonPath, [
+        // Run the research script with arguments using uv run
+        const pythonProcess: ChildProcess = spawn(uvPath, [
+          "run",
+          "python",
           scriptPath,
           topic,
           config.maxLoops.toString(),
@@ -195,7 +200,8 @@ const scriptPath = join(__dirname, "..", "src", "assistant", "run_research.py").
             PYTHONUNBUFFERED: "1",  // Ensure Python output is not buffered
             PYTHONPATH: join(__dirname, "..", "src").replace(/\\/g, "/"),  // Add src directory to Python path
             TAVILY_API_KEY: process.env.TAVILY_API_KEY || "",  // Ensure API key is passed to Python process
-            PERPLEXITY_API_KEY: process.env.PERPLEXITY_API_KEY || ""  // Ensure API key is passed to Python process
+            PERPLEXITY_API_KEY: process.env.PERPLEXITY_API_KEY || "",  // Ensure API key is passed to Python process
+            EXA_API_KEY: process.env.EXA_API_KEY || ""  // Ensure API key is passed to Python process
           },
           cwd: join(__dirname, "..").replace(/\\/g, "/")  // Set working directory to project root
         });
@@ -329,14 +335,14 @@ Sources: ${currentResearch.sources.join("\n")}`,
         try {
           // Validate new configuration
           if (newConfig.maxLoops !== undefined) {
-            if (typeof newConfig.maxLoops !== 'number' || newConfig.maxLoops < 1 || newConfig.maxLoops > 5) {
-              throw new Error("maxLoops must be a number between 1 and 5");
+            if (typeof newConfig.maxLoops !== 'number' || newConfig.maxLoops < 1 || newConfig.maxLoops > 10) {
+              throw new Error("maxLoops must be a number between 1 and 10");
             }
           }
 
           if (newConfig.searchApi !== undefined) {
-            if (newConfig.searchApi !== 'perplexity' && newConfig.searchApi !== 'tavily') {
-              throw new Error("searchApi must be either 'perplexity' or 'tavily'");
+            if (newConfig.searchApi !== 'perplexity' && newConfig.searchApi !== 'tavily' && newConfig.searchApi !== 'exa') {
+              throw new Error("searchApi must be 'perplexity', 'tavily', or 'exa'");
             }
             // Validate API key for new search API
             validateApiKeys(newConfig.searchApi);
@@ -350,7 +356,7 @@ Sources: ${currentResearch.sources.join("\n")}`,
           if (typeof newConfig.llmModel === 'string') {
             validatedConfig.llmModel = newConfig.llmModel;
           }
-          if (newConfig.searchApi === 'perplexity' || newConfig.searchApi === 'tavily') {
+          if (newConfig.searchApi === 'perplexity' || newConfig.searchApi === 'tavily' || newConfig.searchApi === 'exa') {
             validatedConfig.searchApi = newConfig.searchApi;
           }
           

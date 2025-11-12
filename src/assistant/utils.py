@@ -1,9 +1,11 @@
 import os
 import sys
 import requests
-from typing import Dict, Any
+from typing import Dict, Any, List
 from langsmith import traceable
 from tavily import TavilyClient
+from langchain_exa import ExaSearchRetriever
+from langchain_core.documents import Document
 
 def deduplicate_and_format_sources(search_response, max_tokens_per_source, include_raw_content=False):
     """
@@ -171,4 +173,60 @@ def perplexity_search(query: str, perplexity_search_loop_count: int) -> Dict[str
             "raw_content": None
         })
     
+    return {"results": results}
+
+@traceable
+def exa_search(query: str, max_results: int = 3) -> Dict[str, Any]:
+    """Search the web using the Exa API via LangChain.
+
+    Args:
+        query (str): The search query to execute
+        max_results (int): Maximum number of results to return (default: 3)
+
+    Returns:
+        dict: Search response containing:
+            - results (list): List of search result dictionaries, each containing:
+                - title (str): Title of the search result
+                - url (str): URL of the search result
+                - content (str): Snippet/summary of the content
+                - raw_content (str): Full content of the page if available
+    """
+
+    # Get API key from environment
+    api_key = os.environ.get('EXA_API_KEY')
+    if not api_key:
+        raise ValueError("EXA_API_KEY environment variable is required")
+
+    # Initialize Exa retriever
+    retriever = ExaSearchRetriever(
+        api_key=api_key,
+        k=max_results,
+        highlights=True
+    )
+
+    # Perform search
+    documents: List[Document] = retriever.invoke(query)
+
+    # Convert LangChain documents to our standard format
+    results = []
+    for i, doc in enumerate(documents, 1):
+        # Extract metadata
+        metadata = doc.metadata
+        url = metadata.get('url', 'https://exa.ai')
+        title = metadata.get('title', f'Exa Search Result {i}')
+
+        # Get highlights if available, otherwise use page_content
+        highlights = metadata.get('highlights', [])
+        if highlights:
+            content = ' '.join(highlights)
+        else:
+            content = doc.page_content[:500] + "..." if len(doc.page_content) > 500 else doc.page_content
+
+        results.append({
+            "title": title,
+            "url": url,
+            "content": content,
+            "raw_content": doc.page_content
+        })
+
     return {"results": results}

@@ -10,19 +10,21 @@ from enum import Enum
 class SearchAPI(Enum):
     PERPLEXITY = "perplexity"
     TAVILY = "tavily"
+    EXA = "exa"
 
 @dataclass
 class Configuration:
     """The configurable fields for the research assistant."""
     # Required fields with defaults
-    max_web_research_loops: int = 3
-    local_llm: str = "llama3.2"
+    max_web_research_loops: int = 7
+    local_llm: str = "kimi-k2-thinking:cloud"
     ollama_base_url: str = "http://localhost:11434"  # Add Ollama base URL
     search_api: SearchAPI = SearchAPI.PERPLEXITY  # Default to PERPLEXITY
     
     # API Keys
     tavily_api_key: Optional[str] = None
     perplexity_api_key: Optional[str] = None
+    exa_api_key: Optional[str] = None
     
     # LangSmith configuration
     langsmith_tracing: bool = False
