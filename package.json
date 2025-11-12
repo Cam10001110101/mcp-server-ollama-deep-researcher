@@ -7,7 +7,7 @@
     "start": "node build/index.js"
   },
   "dependencies": {
-    "@modelcontextprotocol/sdk": "1.12.0",
+    "@modelcontextprotocol/sdk": "1.12.1",
     "@types/dotenv": "^6.1.1",
     "dotenv": "^16.4.7",
     "langsmith": "^0.3.29"
