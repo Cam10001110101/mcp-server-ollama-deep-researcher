@@ -7,13 +7,11 @@
     "start": "node build/index.js"
   },
   "dependencies": {
-    "@modelcontextprotocol/sdk": "1.12.1",
-    "@types/dotenv": "^6.1.1",
-    "dotenv": "^16.6.1",
-    "langsmith": "^0.3.31"
+    "@modelcontextprotocol/sdk": "^1.29.0",
+    "zod": "^4.4.3"
   },
   "devDependencies": {
-    "@types/node": "^20.0.0",
-    "typescript": "^5.7.3"
+    "@types/node": "^26.0.0",
+    "typescript": "^6.0.3"
   }
 }

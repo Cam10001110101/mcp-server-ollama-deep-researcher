@@ -1,4 +1,4 @@
-FROM node:20-slim AS node-builder
+FROM node:22-slim AS node-builder
 
 # Set working directory
 WORKDIR /app
@@ -13,7 +13,7 @@ COPY src/index.ts ./src/
 RUN npm run build
 
 # Use Python image for the final stage
-FROM python:3.14.0rc1-slim
+FROM python:3.12-slim
 
 # Set working directory
 WORKDIR /app
@@ -22,7 +22,7 @@ WORKDIR /app
 RUN apt-get update && apt-get install -y \
     curl \
     gnupg \
-    && curl -fsSL https://deb.nodesource.com/setup_20.x | bash - \
+    && curl -fsSL https://deb.nodesource.com/setup_22.x | bash - \
     && apt-get install -y nodejs \
     && apt-get clean \
     && rm -rf /var/lib/apt/lists/*
@@ -42,6 +42,7 @@ RUN pip install --no-cache-dir -e .
 # Set environment variables
 ENV NODE_ENV=production
 ENV PYTHONPATH=/app
+ENV DOCKER_CONTAINER=true
 
 # The MCP server will run on stdio, so no port needs to be exposed
 # However, we need to ensure the server can connect to Ollama

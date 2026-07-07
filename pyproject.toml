@@ -9,7 +9,10 @@ dependencies = [
     "langchain-ollama>=0.0.1",
     "langchain-exa>=0.1.0",
     "tavily-python>=0.5.1",
-    "pplx>=0.0.1"
+    "pplx>=0.0.1",
+    "langsmith>=0.3.31",
+    "requests>=2.32.0",
+    "typing-extensions>=4.0"
 ]
 
 [build-system]

@@ -85,7 +85,7 @@ See `manifest.json` for the full DXT manifest, including tool schemas and resour
 ## Logging & Debugging
 
 - All server logs and errors are output to `stderr` for debugging.
-- Research subprocesses are killed after 5 minutes to prevent hangs.
+- Research subprocesses are killed after 30 minutes to prevent hangs.
 - Invalid requests and configuration errors return clear, structured error messages.
 
 ## Security & Best Practices
@@ -104,7 +104,7 @@ See `manifest.json` for the full DXT manifest, including tool schemas and resour
 
 - **Missing API key:** Ensure `TAVILY_API_KEY`, `PERPLEXITY_API_KEY`, or `EXA_API_KEY` is set in your environment depending on which search API you're using.
 - **Python errors:** Check Python dependencies and logs in `stderr`.
-- **Timeouts:** Research subprocesses are limited to 5 minutes.
+- **Timeouts:** Research subprocesses are limited to 30 minutes.
 
 ## Search API Comparison
 

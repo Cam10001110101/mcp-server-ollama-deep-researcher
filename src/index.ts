@@ -1,20 +1,16 @@
 #!/usr/bin/env node
-import { Server } from "@modelcontextprotocol/sdk/server/index.js";
+import { McpServer, ResourceTemplate } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
-import { 
-  ListToolsRequestSchema, 
-  CallToolRequestSchema,
-  ListResourcesRequestSchema,
-  ListResourceTemplatesRequestSchema,
-  ReadResourceRequestSchema,
-  ErrorCode,
-  McpError
-} from "@modelcontextprotocol/sdk/types.js";
+import { McpError } from "@modelcontextprotocol/sdk/types.js";
 import { spawn, ChildProcess } from "child_process";
 import { dirname, join } from "path";
 import { fileURLToPath } from "url";
+import { z } from "zod";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
+
+// JSON-RPC error code for "Resource not found" per MCP spec 2025-11-25
+const RESOURCE_NOT_FOUND = -32002;
 
 // Define response type
 interface PythonResponse {
@@ -57,8 +53,8 @@ interface ResearchConfig {
 
 let config: ResearchConfig = {
   maxLoops: 7,
-  llmModel: "kimi-k2-thinking:cloud",
-  searchApi: "tavily"
+  llmModel: "gemma4:31b",
+  searchApi: "perplexity"
 };
 
 // Validate required API keys based on search API
@@ -75,391 +71,289 @@ function validateApiKeys(searchApi: string): void {
 }
 
 // Initialize server
-const server = new Server(
-  {
-    name: "ollama-deep-researcher",
-    version: "1.0.0",
-  },
-  {
-    capabilities: {
-      tools: {
-        method: "tools/list"
-      },
-      resources: {
-        method: "resources/list"
-      }
-    }
-  }
-);
-
-// Define available tools
-server.setRequestHandler(ListToolsRequestSchema, async () => {
-  const tools = [
-    {
-      name: "research",
-      description: "Research a topic using web search and LLM synthesis",
-      inputSchema: {
-        type: "object",
-        properties: {
-          topic: {
-            type: "string",
-            description: "The topic to research"
-          }
-        },
-        required: ["topic"],
-      },
-    },
-    {
-      name: "get_status",
-      description: "Get the current status of any ongoing research",
-      inputSchema: {
-        type: "object",
-        properties: {
-          _dummy: {
-            type: "string",
-            description: "No parameters needed",
-            const: "dummy"
-          }
-        },
-        required: ["_dummy"],
-        additionalProperties: false
-      } as const,
-    },
-    {
-      name: "configure",
-      description: "Configure the research parameters (max loops, LLM model, search API)",
-      inputSchema: {
-        type: "object",
-        properties: {
-          maxLoops: {
-            type: "number",
-            description: "Maximum number of research loops (1-10)"
-          },
-          llmModel: {
-            type: "string",
-            description: "Ollama model to use (e.g. llama3.2)"
-          },
-          searchApi: {
-            type: "string",
-            enum: ["perplexity", "tavily", "exa"],
-            description: "Search API to use for web research"
-          }
-        },
-        required: [],
-      },
-    },
-  ];
-
-  return { tools };
+const server = new McpServer({
+  name: "ollama-deep-researcher",
+  title: "Ollama Deep Researcher",
+  version: "1.0.0",
+  description: "Deep research on any topic using Ollama LLMs with web search (Tavily, Perplexity, Exa)"
 });
 
-// Handle tool execution
-server.setRequestHandler(CallToolRequestSchema, async (request) => {
-  switch (request.params.name) {
-    case "research": {
-      const topic = request.params.arguments?.topic as string | undefined;
-      if (!topic) {
-        return {
-          content: [
-            {
-              type: "text",
-              text: "Research topic is required",
-            },
-          ],
-          isError: true,
-        };
-      }
+server.registerTool(
+  "research",
+  {
+    description: "Research a topic using web search and LLM synthesis",
+    inputSchema: {
+      topic: z.string().describe("The topic to research")
+    }
+  },
+  async ({ topic }) => {
+    try {
+      // Validate API keys before starting research
+      validateApiKeys(config.searchApi);
 
-      try {
-        // Validate API keys before starting research
-        validateApiKeys(config.searchApi);
+      // In Docker the image installs dependencies with pip and has no uv,
+      // so run python3 directly; locally use uv to get the project venv.
+      const isDocker = process.env.DOCKER_CONTAINER === "true";
+      const scriptPath = isDocker
+        ? "/app/src/assistant/run_research.py"
+        : join(__dirname, "..", "src", "assistant", "run_research.py").replace(/\\/g, "/");
+      const [command, baseArgs] = isDocker
+        ? ["python3", [] as string[]]
+        : ["uv", ["run", "python"]];
 
-        // Validate max loops
-        if (config.maxLoops < 1 || config.maxLoops > 10) {
-          throw new Error("maxLoops must be between 1 and 10");
+      const pythonProcess: ChildProcess = spawn(command, [
+        ...baseArgs,
+        scriptPath,
+        topic,
+        config.maxLoops.toString(),
+        config.llmModel,
+        config.searchApi
+      ], {
+        env: {
+          ...process.env,  // Pass through existing environment variables
+          PYTHONUNBUFFERED: "1",  // Ensure Python output is not buffered
+          PYTHONPATH: isDocker ? "/app/src" : join(__dirname, "..", "src").replace(/\\/g, "/"),  // Add src directory to Python path
+          TAVILY_API_KEY: process.env.TAVILY_API_KEY || "",  // Ensure API key is passed to Python process
+          PERPLEXITY_API_KEY: process.env.PERPLEXITY_API_KEY || "",  // Ensure API key is passed to Python process
+          EXA_API_KEY: process.env.EXA_API_KEY || ""  // Ensure API key is passed to Python process
+        },
+        cwd: isDocker ? "/app" : join(__dirname, "..").replace(/\\/g, "/")  // Set working directory
+      });
+
+      // Collect output using Promise with 30 minute timeout
+      // (larger models like gemma4:31b can take ~6 minutes per research loop)
+      const output = await new Promise<string>((resolve, reject) => {
+        const timeout = setTimeout(() => {
+          pythonProcess.kill();
+          reject(new Error('Research process timed out after 30 minutes'));
+        }, 1800000); // 30 minutes
+        let stdout = '';
+        let stderr = '';
+
+        if (pythonProcess.stdout) {
+          pythonProcess.stdout.on("data", (data: Buffer) => {
+            const output = data.toString().trim();
+            if (output) {
+              stdout += output;
+              console.error(`[research] ${output}`);
+            }
+          });
+        }
+        if (pythonProcess.stderr) {
+          pythonProcess.stderr.on("data", (data: Buffer) => {
+            const error = data.toString().trim();
+            if (error) {
+              stderr += error;
+              console.error(`[research error] ${error}`);
+            }
+          });
         }
 
-        // Use UV to run Python with the correct virtual environment
-        const uvPath = "uv";
-
-        // Get absolute path to Python script from src directory
-const scriptPath = join(__dirname, "..", "src", "assistant", "run_research.py").replace(/\\/g, "/");
-
-        // Run the research script with arguments using uv run
-        const pythonProcess: ChildProcess = spawn(uvPath, [
-          "run",
-          "python",
-          scriptPath,
-          topic,
-          config.maxLoops.toString(),
-          config.llmModel,
-          config.searchApi
-        ], {
-          env: {
-            ...process.env,  // Pass through existing environment variables
-            PYTHONUNBUFFERED: "1",  // Ensure Python output is not buffered
-            PYTHONPATH: join(__dirname, "..", "src").replace(/\\/g, "/"),  // Add src directory to Python path
-            TAVILY_API_KEY: process.env.TAVILY_API_KEY || "",  // Ensure API key is passed to Python process
-            PERPLEXITY_API_KEY: process.env.PERPLEXITY_API_KEY || "",  // Ensure API key is passed to Python process
-            EXA_API_KEY: process.env.EXA_API_KEY || ""  // Ensure API key is passed to Python process
-          },
-          cwd: join(__dirname, "..").replace(/\\/g, "/")  // Set working directory to project root
+        pythonProcess.on("error", (error: Error) => {
+          reject(new Error(`Failed to start Python process: ${error.message}`));
         });
 
-        // Collect output using Promise with 5 minute timeout
-        const output = await new Promise<string>((resolve, reject) => {
-          const timeout = setTimeout(() => {
-            pythonProcess.kill();
-            reject(new Error('Research process timed out after 5 minutes'));
-          }, 300000); // 5 minutes
-          let stdout = '';
-          let stderr = '';
-
-          if (pythonProcess.stdout) {
-            pythonProcess.stdout.on("data", (data: Buffer) => {
-              const output = data.toString().trim();
-              if (output) {
-                stdout += output;
-                console.error(`[research] ${output}`);
-              }
-            });
-          }
-          if (pythonProcess.stderr) {
-            pythonProcess.stderr.on("data", (data: Buffer) => {
-              const error = data.toString().trim();
-              if (error) {
-                stderr += error;
-                console.error(`[research error] ${error}`);
-              }
-            });
+        pythonProcess.on("close", (code: number) => {
+          clearTimeout(timeout);
+          if (code !== 0) {
+            reject(new Error(`Python process exited with code ${code}. Error: ${stderr}`));
+            return;
           }
 
-          pythonProcess.on("error", (error: Error) => {
-            reject(new Error(`Failed to start Python process: ${error.message}`));
-          });
-
-          pythonProcess.on("close", (code: number) => {
-            clearTimeout(timeout);
-            if (code !== 0) {
-              reject(new Error(`Python process exited with code ${code}. Error: ${stderr}`));
-              return;
+          try {
+            const result = JSON.parse(stdout.trim()) as PythonResponse;
+            if (result.error) {
+              reject(new Error(result.error));
+            } else if (result.summary) {
+              resolve(result.summary);
+            } else {
+              resolve('No summary available');
             }
-
-            try {
-              const result = JSON.parse(stdout.trim()) as PythonResponse;
-              if (result.error) {
-                reject(new Error(result.error));
-              } else if (result.summary) {
-                resolve(result.summary);
-              } else {
-                resolve('No summary available');
-              }
-            } catch (e) {
-              reject(new Error(`Failed to parse Python output: ${e}\nStdout: ${stdout}\nStderr: ${stderr}`));
-            }
-          });
+          } catch (e) {
+            reject(new Error(`Failed to parse Python output: ${e}\nStdout: ${stdout}\nStderr: ${stderr}`));
+          }
         });
+      });
 
-        // Store completed research result
-        const result: ResearchResult = {
-          topic,
-          summary: output,
-          sources: [],
-          timestamp: new Date().toISOString()
-        };
-        researchResults.set(topicToUri(topic), result);
+      // Store completed research result
+      const result: ResearchResult = {
+        topic,
+        summary: output,
+        sources: [],
+        timestamp: new Date().toISOString()
+      };
+      researchResults.set(topicToUri(topic), result);
+      // Notify clients that the resource list has a new entry
+      server.sendResourceListChanged();
 
-        // Update research state
-        currentResearch = {
-          topic,
-          currentStep: "completed",
-          loopCount: config.maxLoops,
-          summary: output,
-          sources: []
-        };
-
-        return {
-          content: [
-            {
-              type: "text",
-              text: `Research completed. Summary:\n\n${output}`,
-            },
-          ],
-        };
-      } catch (error) {
-        const errorMessage = error instanceof Error ? error.message : String(error);
-        return {
-          content: [
-            {
-              type: "text",
-              text: `Research failed: ${errorMessage}`,
-            },
-          ],
-          isError: true,
-        };
-      }
-    }
-
-    case "get_status": {
-      if (!currentResearch) {
-        return {
-          content: [
-            {
-              type: "text",
-              text: "No research is currently in progress.",
-            },
-          ],
-        };
-      }
+      // Update research state
+      currentResearch = {
+        topic,
+        currentStep: "completed",
+        loopCount: config.maxLoops,
+        summary: output,
+        sources: []
+      };
 
       return {
         content: [
           {
-            type: "text",
-            text: `Research Status:
+            type: "text" as const,
+            text: `Research completed. Summary:\n\n${output}`,
+          },
+        ],
+      };
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : String(error);
+      return {
+        content: [
+          {
+            type: "text" as const,
+            text: `Research failed: ${errorMessage}`,
+          },
+        ],
+        isError: true,
+      };
+    }
+  }
+);
+
+server.registerTool(
+  "get_status",
+  {
+    description: "Get the current status of any ongoing research",
+    inputSchema: {}
+  },
+  async () => {
+    if (!currentResearch) {
+      return {
+        content: [
+          {
+            type: "text" as const,
+            text: "No research is currently in progress.",
+          },
+        ],
+      };
+    }
+
+    return {
+      content: [
+        {
+          type: "text" as const,
+          text: `Research Status:
 Topic: ${currentResearch.topic}
 Current Step: ${currentResearch.currentStep}
 Loop Count: ${currentResearch.loopCount}
 Summary: ${currentResearch.summary}
 Sources: ${currentResearch.sources.join("\n")}`,
-          },
-        ],
-      };
+        },
+      ],
+    };
+  }
+);
+
+server.registerTool(
+  "configure",
+  {
+    description: "Configure the research parameters (max loops, LLM model, search API)",
+    inputSchema: {
+      maxLoops: z.number().min(1).max(10).optional()
+        .describe("Maximum number of research loops (1-10)"),
+      llmModel: z.string().optional()
+        .describe("Ollama model to use (e.g. gemma4:31b)"),
+      searchApi: z.enum(["perplexity", "tavily", "exa"]).optional()
+        .describe("Search API to use for web research")
+    }
+  },
+  async ({ maxLoops, llmModel, searchApi }) => {
+    const hasUpdates = maxLoops !== undefined || llmModel !== undefined || searchApi !== undefined;
+    let configMessage = 'Current research configuration:';
+
+    if (hasUpdates) {
+      try {
+        // Validate API key for new search API before applying it
+        if (searchApi !== undefined) {
+          validateApiKeys(searchApi);
+        }
+
+        config = {
+          ...config,
+          ...(maxLoops !== undefined && { maxLoops }),
+          ...(llmModel !== undefined && { llmModel }),
+          ...(searchApi !== undefined && { searchApi })
+        };
+        configMessage = 'Research configuration updated:';
+      } catch (error) {
+        return {
+          content: [
+            {
+              type: "text" as const,
+              text: `Configuration error: ${error instanceof Error ? error.message : String(error)}`,
+            },
+          ],
+          isError: true,
+        };
+      }
     }
 
-    case "configure": {
-      const newConfig = request.params.arguments;
-      let configMessage = '';
-
-      if (newConfig && Object.keys(newConfig).length > 0) {
-        try {
-          // Validate new configuration
-          if (newConfig.maxLoops !== undefined) {
-            if (typeof newConfig.maxLoops !== 'number' || newConfig.maxLoops < 1 || newConfig.maxLoops > 10) {
-              throw new Error("maxLoops must be a number between 1 and 10");
-            }
-          }
-
-          if (newConfig.searchApi !== undefined) {
-            if (newConfig.searchApi !== 'perplexity' && newConfig.searchApi !== 'tavily' && newConfig.searchApi !== 'exa') {
-              throw new Error("searchApi must be 'perplexity', 'tavily', or 'exa'");
-            }
-            // Validate API key for new search API
-            validateApiKeys(newConfig.searchApi);
-          }
-
-          // Type guard to ensure properties match ResearchConfig
-          const validatedConfig: Partial<ResearchConfig> = {};
-          if (typeof newConfig.maxLoops === 'number') {
-            validatedConfig.maxLoops = newConfig.maxLoops;
-          }
-          if (typeof newConfig.llmModel === 'string') {
-            validatedConfig.llmModel = newConfig.llmModel;
-          }
-          if (newConfig.searchApi === 'perplexity' || newConfig.searchApi === 'tavily' || newConfig.searchApi === 'exa') {
-            validatedConfig.searchApi = newConfig.searchApi;
-          }
-          
-          config = {
-            ...config,
-            ...validatedConfig
-          };
-          configMessage = 'Research configuration updated:';
-        } catch (error) {
-          return {
-            content: [
-              {
-                type: "text",
-                text: `Configuration error: ${error instanceof Error ? error.message : String(error)}`,
-              },
-            ],
-            isError: true,
-          };
-        }
-      } else {
-        configMessage = 'Current research configuration:';
-      }
-
-      return {
-        content: [
-          {
-            type: "text",
-            text: `${configMessage}
+    return {
+      content: [
+        {
+          type: "text" as const,
+          text: `${configMessage}
 Max Loops: ${config.maxLoops}
 LLM Model: ${config.llmModel}
 Search API: ${config.searchApi}`,
-          },
-        ],
-      };
-    }
-
-    default:
-      return {
-        content: [
-          {
-            type: "text",
-            text: `Unknown tool: ${request.params.name}`,
-          },
-        ],
-        isError: true,
-      };
+        },
+      ],
+    };
   }
-});
+);
 
-// Handle resource listing
-server.setRequestHandler(ListResourcesRequestSchema, async () => {
-  const resources = Array.from(researchResults.entries()).map(([uri, result]) => ({
-    uri: `research://${uri}`,
-    name: result.topic,
-    description: `Research results for "${result.topic}" from ${new Date(result.timestamp).toLocaleString()}`,
+// Research results as resources: research://{topic}
+// The template's list callback enumerates completed results; the read
+// callback serves an individual result. Results are keyed by
+// topicToUri(topic), which is already URI-encoded.
+server.registerResource(
+  "research",
+  new ResourceTemplate("research://{topic}", {
+    list: async () => ({
+      resources: Array.from(researchResults.entries()).map(([uri, result]) => ({
+        uri: `research://${uri}`,
+        name: result.topic,
+        description: `Research results for "${result.topic}" from ${new Date(result.timestamp).toLocaleString()}`,
+        mimeType: "application/json"
+      }))
+    })
+  }),
+  {
+    title: "Research Results by Topic",
+    description: "Access research results for a specific topic",
     mimeType: "application/json"
-  }));
+  },
+  async (uri, { topic }) => {
+    const key = Array.isArray(topic) ? topic[0] : topic;
+    const result = researchResults.get(key);
 
-  return { resources };
-});
-
-// Handle resource templates
-server.setRequestHandler(ListResourceTemplatesRequestSchema, async () => ({
-  resourceTemplates: [
-    {
-      uriTemplate: "research://{topic}",
-      name: "Research Results by Topic",
-      description: "Access research results for a specific topic",
-      mimeType: "application/json"
+    if (!result) {
+      throw new McpError(
+        RESOURCE_NOT_FOUND,
+        "Resource not found",
+        { uri: uri.href }
+      );
     }
-  ]
-}));
 
-// Handle resource reading
-server.setRequestHandler(ReadResourceRequestSchema, async (request) => {
-  const match = request.params.uri.match(/^research:\/\/(.+)$/);
-  if (!match) {
-    throw new McpError(
-      ErrorCode.InvalidRequest,
-      `Invalid research URI format: ${request.params.uri}`
-    );
+    return {
+      contents: [
+        {
+          uri: uri.href,
+          mimeType: "application/json",
+          text: JSON.stringify(result, null, 2)
+        }
+      ]
+    };
   }
-
-  const topic = decodeURIComponent(match[1]);
-  const result = researchResults.get(topic);
-
-  if (!result) {
-    throw new McpError(
-      ErrorCode.MethodNotFound,
-      `No research found for topic: ${topic}`
-    );
-  }
-
-  return {
-    contents: [
-      {
-        uri: request.params.uri,
-        mimeType: "application/json",
-        text: JSON.stringify(result, null, 2)
-      }
-    ]
-  };
-});
+);
 
 // Initialize and run the server
 const transport = new StdioServerTransport();

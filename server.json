@@ -1,7 +1,7 @@
 {
   "$schema": "https://static.modelcontextprotocol.io/schemas/2025-09-29/server.schema.json",
   "name": "io.github.Cam10001110101/mcp-server-ollama-deep-researcher",
-  "description": "An MCP server that provides [describe what your server does]",
+  "description": "MCP server for deep research using Ollama LLMs with web search APIs (Tavily, Perplexity, Exa). Supports configurable research loops, LLM models, and search APIs with status tracking and resource access.",
   "repository": {
     "url": "https://github.com/Cam10001110101/mcp-server-ollama-deep-researcher",
     "source": "github"
@@ -18,11 +18,39 @@
       },
       "environmentVariables": [
         {
-          "description": "Your API key for the service",
-          "isRequired": true,
+          "description": "Tavily API key for web search",
+          "isRequired": false,
           "format": "string",
           "isSecret": true,
-          "name": "YOUR_API_KEY"
+          "name": "TAVILY_API_KEY"
+        },
+        {
+          "description": "Perplexity API key for web search",
+          "isRequired": false,
+          "format": "string",
+          "isSecret": true,
+          "name": "PERPLEXITY_API_KEY"
+        },
+        {
+          "description": "Exa API key for web search",
+          "isRequired": false,
+          "format": "string",
+          "isSecret": true,
+          "name": "EXA_API_KEY"
+        },
+        {
+          "description": "Ollama base URL (default: http://localhost:11434)",
+          "isRequired": false,
+          "format": "string",
+          "isSecret": false,
+          "name": "OLLAMA_BASE_URL"
+        },
+        {
+          "description": "LangSmith API key for tracing",
+          "isRequired": false,
+          "format": "string",
+          "isSecret": true,
+          "name": "LANGSMITH_API_KEY"
         }
       ]
     }

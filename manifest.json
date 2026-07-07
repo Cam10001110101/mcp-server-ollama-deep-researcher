@@ -5,10 +5,10 @@
   "version": "1.0.0",
   "dxt_version": "1.0.0",
   "author": {
-    "name": "Your Name or Organization",
-    "email": "your@email.com"
+    "name": "Cameron Rohn",
+    "email": "cameron@cameronrohn.com"
   },
-  "homepage_url": "https://github.com/anthropics/dxt",
+  "homepage_url": "https://github.com/Cam10001110101/mcp-server-ollama-deep-researcher",
   "license": "MIT",
   "categories": ["research", "AI", "MCP", "desktop-extension"],
   "entrypoint": "src/index.ts",
@@ -44,14 +44,6 @@
         "description": "Get the current status of any ongoing research",
         "inputSchema": {
           "type": "object",
-          "properties": {
-            "_dummy": {
-              "type": "string",
-              "description": "No parameters needed",
-              "const": "dummy"
-            }
-          },
-          "required": ["_dummy"],
           "additionalProperties": false
         }
       },
@@ -63,15 +55,15 @@
           "properties": {
             "maxLoops": {
               "type": "number",
-              "description": "Maximum number of research loops (1-5)"
+              "description": "Maximum number of research loops (1-10)"
             },
             "llmModel": {
               "type": "string",
-              "description": "Ollama model to use (e.g. llama3.2)"
+              "description": "Ollama model to use (e.g. gemma4:31b)"
             },
             "searchApi": {
               "type": "string",
-              "enum": ["perplexity", "tavily"],
+              "enum": ["perplexity", "tavily", "exa"],
               "description": "Search API to use for web research"
             }
           },

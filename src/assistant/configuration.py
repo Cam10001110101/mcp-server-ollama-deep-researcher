@@ -17,7 +17,7 @@ class Configuration:
     """The configurable fields for the research assistant."""
     # Required fields with defaults
     max_web_research_loops: int = 7
-    local_llm: str = "kimi-k2-thinking:cloud"
+    local_llm: str = "gemma4:31b"
     ollama_base_url: str = "http://localhost:11434"  # Add Ollama base URL
     search_api: SearchAPI = SearchAPI.PERPLEXITY  # Default to PERPLEXITY
     
