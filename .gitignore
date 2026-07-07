@@ -89,3 +89,7 @@ pids/
 # stays usable for contributors who don't use 1Password.
 .claude/claude-code-1password-hooks-bundle/
 .claude/settings.json
+
+# Local-only MCP spec reference dumps used for ad-hoc compliance audits.
+# Large vendored text files, not source of truth — keep them local.
+mcp-llms-full.txt*
