@@ -143,6 +143,17 @@ You can import an existing `.env` directly when creating the Environment. Once i
 
 Copy `.mcp.json.1password.example` → `.mcp.json` (gitignored), replace `<ENVIRONMENT_ID>` with your Environment ID, and your MCP host will resolve secrets at launch via `op run`. Non-secret config stays in the `env` block; secrets are injected from the Environment. The template uses the full path `/opt/homebrew/bin/op` because GUI-launched hosts (e.g. Claude Desktop) don't inherit your shell `$PATH` — adjust if your `op` lives elsewhere (`which op`).
 
+> **Fallback if your `op` CLI lacks `--environment`** (the `environment` subcommand is part of the 1Password Environments beta and is absent from some builds, e.g. `op` v2.34.x): use `op run --env-file .env` against a plain `.env` of `op://` references instead. Create the item once (`op item create --vault "Your Vault" --category "Login" --title "ollama-deep-researcher" "TAVILY_API_KEY[concealed]=..." …`), then write a gitignored `.env` of references and point the launcher at it:
+>
+> ```sh
+> # .env (gitignored) — references only, no plaintext
+> # TAVILY_API_KEY=op://Your Vault/ollama-deep-researcher/TAVILY_API_KEY
+> # …
+> op run --env-file .env -- node build/index.js
+> ```
+>
+> The same `.env` also powers Docker (see below), so one references file covers both launch paths. `op run` prompts Touch ID once per launch.
+
 ### C. `op inject` template for `.mcp.json`
 
 For MCP hosts that can't use `op run`, copy `.mcp.json.template` → a working file, replace `<vault>` with your vault name, then materialize the `{{ op://... }}` references into real values:
@@ -155,13 +166,11 @@ op inject -i .mcp.json.template -o .mcp.json
 
 ### Docker
 
-`docker-compose.yml` interpolates all eight vars from the environment. With the mounted `.env` FIFO, run:
+`docker-compose.yml` interpolates all eight vars from the environment. Run compose through `op run --env-file` so the `op://` references in `.env` (or the FIFO mount, if you set one up in A) are resolved and forwarded into the container:
 
 ```sh
 op run --env-file .env -- docker compose up
 ```
-
-so the FIFO is read and the values are forwarded into the container.
 
 ## References
 

@@ -6,6 +6,12 @@
 # This file contains no secrets — only the list of paths to validate.
 # Install the hook: https://github.com/1Password/agent-hooks
 # Local .env FIFO mounts are supported on macOS and Linux only.
-# Temporarily disabled to test the `op` CLI method without a mounted .env FIFO.
-# Restore to `mount_paths = [".env"]` once the .env FIFO mount is configured.
+#
+# Disabled on this machine: the `environment` subcommand (1Password Environments
+# beta) is absent from the installed `op` CLI (v2.34.x), so the `.env` here is a
+# plain file of `op://` references consumed by `op run --env-file`, not a FIFO
+# mount. Re-enabling validation without a real FIFO would deny every Bash
+# command. To switch to the FIFO pattern: upgrade `op` to a build with Environments
+# support, mount the Environment at `.env` in the 1Password desktop app, then set
+# `mount_paths = [".env"]`.
 mount_paths = []
