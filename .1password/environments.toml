@@ -1,0 +1,11 @@
+# 1Password Environments — mount path configuration.
+# Tells the `1password-validate-mounted-env-files` agent hook which local
+# .env files must be valid FIFO mounts (served from a 1Password Environment)
+# before an AI agent is allowed to execute shell commands.
+#
+# This file contains no secrets — only the list of paths to validate.
+# Install the hook: https://github.com/1Password/agent-hooks
+# Local .env FIFO mounts are supported on macOS and Linux only.
+# Temporarily disabled to test the `op` CLI method without a mounted .env FIFO.
+# Restore to `mount_paths = [".env"]` once the .env FIFO mount is configured.
+mount_paths = []

@@ -1,0 +1,18 @@
+{
+  "mcpServers": {
+    "ollama-deep-researcher": {
+      "command": "node",
+      "args": ["build/index.js"],
+      "env": {
+        "TAVILY_API_KEY": "{{ op://<vault>/ollama-deep-researcher/TAVILY_API_KEY }}",
+        "PERPLEXITY_API_KEY": "{{ op://<vault>/ollama-deep-researcher/PERPLEXITY_API_KEY }}",
+        "EXA_API_KEY": "{{ op://<vault>/ollama-deep-researcher/EXA_API_KEY }}",
+        "LANGSMITH_API_KEY": "{{ op://<vault>/ollama-deep-researcher/LANGSMITH_API_KEY }}",
+        "OLLAMA_BASE_URL": "http://localhost:11434",
+        "LANGSMITH_TRACING": "false",
+        "LANGSMITH_ENDPOINT": "https://api.smith.langchain.com",
+        "LANGSMITH_PROJECT": "ollama-deep-researcher-mcp-server"
+      }
+    }
+  }
+}

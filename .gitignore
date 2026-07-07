@@ -83,3 +83,9 @@ pids/
 
 # LangSmith
 .langchain/
+
+# 1Password agent-hook wiring (local only, opt-in).
+# The hook bundle and generated settings.json are not committed so the repo
+# stays usable for contributors who don't use 1Password.
+.claude/claude-code-1password-hooks-bundle/
+.claude/settings.json
