@@ -88,6 +88,22 @@ server.registerTool(
   },
   async ({ topic }) => {
     try {
+      // Semantic input validation: a non-empty topic is required for a useful
+      // research run. Per MCP 2025-11-25 (SEP-1303) this kind of input
+      // validation error is reported as a Tool Execution Error (isError: true)
+      // so the model can self-correct, rather than a Protocol Error.
+      if (typeof topic !== "string" || topic.trim().length === 0) {
+        return {
+          content: [
+            {
+              type: "text" as const,
+              text: "Invalid topic: must be a non-empty string. Please provide a research topic and retry.",
+            },
+          ],
+          isError: true,
+        };
+      }
+
       // Validate API keys before starting research
       validateApiKeys(config.searchApi);
 
@@ -257,7 +273,7 @@ server.registerTool(
   {
     description: "Configure the research parameters (max loops, LLM model, search API)",
     inputSchema: {
-      maxLoops: z.number().min(1).max(10).optional()
+      maxLoops: z.number().optional()
         .describe("Maximum number of research loops (1-10)"),
       llmModel: z.string().optional()
         .describe("Ollama model to use (e.g. gemma4:31b)"),
@@ -271,6 +287,15 @@ server.registerTool(
 
     if (hasUpdates) {
       try {
+        // Semantic input validation: maxLoops must be in [1, 10]. Per MCP
+        // 2025-11-25 (SEP-1303) a "value out of range" error is a Tool
+        // Execution Error (isError: true) so the model can self-correct,
+        // not a Protocol Error. The schema accepts any number so this range
+        // check, not zod, governs the error response.
+        if (maxLoops !== undefined && (!Number.isInteger(maxLoops) || maxLoops < 1 || maxLoops > 10)) {
+          throw new Error("maxLoops must be an integer between 1 and 10");
+        }
+
         // Validate API key for new search API before applying it
         if (searchApi !== undefined) {
           validateApiKeys(searchApi);
