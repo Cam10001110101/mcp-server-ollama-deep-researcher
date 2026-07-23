@@ -1,3 +1,14 @@
+> # ⛔ ARCHIVED — this code has moved
+>
+> Migrated into the **mcpcentral platform monorepo** on 2026-07-23 (ADR-043).
+>
+> **Work here instead:** `mcpcentral-io/mcpcentral` → `apps/deep-researcher/`
+> **Worker:** `mcpcentral-deep-researcher`
+>
+> This repository is read-only and kept for history. See [DEPRECATED.md](./DEPRECATED.md).
+
+---
+
 # Ollama Deep Researcher DXT Extension
 
 ## Overview
@@ -180,4 +191,3 @@ op run --env-file .env -- docker compose up
 - [Model Context Protocol SDK](https://github.com/modelcontextprotocol/sdk)
 
 ---
-
